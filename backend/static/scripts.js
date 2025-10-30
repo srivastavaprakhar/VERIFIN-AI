@@ -28,10 +28,10 @@ form.addEventListener('submit', async (e) => {
 
     // Run discrepancy detection
     const res = await fetch('/detect-discrepancy?request=Find mismatched totals and suppliers');
-    const data = await res.json();
+    const text = await res.text();
 
     loading.style.display = 'none';
-    resultText.textContent = JSON.stringify(data, null, 2);
+    resultText.textContent = text;
   } catch (err) {
     loading.style.display = 'none';
     resultText.textContent = 'Error: ' + err.message;

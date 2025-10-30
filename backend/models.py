@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text
+from sqlalchemy import Column, Integer, String, Text, DateTime, func
 from db import Base
 
 class InvoiceData(Base):
@@ -16,8 +16,9 @@ class POData(Base):
     parsed_data = Column(Text)
 
 class Discrepancy(Base):
-    __tablename__ = "discrepancy_data"
+    __tablename__ = "discrepancies"
+
     id = Column(Integer, primary_key=True, index=True)
-    field = Column(String(255))
-    invoice_value = Column(Text)
-    po_value = Column(Text)
+    description = Column(String(255))  # ✅ Add this line
+    details = Column(Text)             # stores JSON or text summary
+    timestamp = Column(DateTime, server_default=func.now())

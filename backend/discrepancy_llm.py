@@ -1,51 +1,69 @@
+# discrepancy_llm.py
 import sqlite3
 import os
 from openai import OpenAI
+from dotenv import load_dotenv
 
-# Initialize Shivaay client
+load_dotenv()
+# Use env var for base_url and key; change as per Shivaay docs if needed.
 client = OpenAI(
     api_key=os.getenv("SHIVAAY_API_KEY"),
-    base_url="https://api.futurixai.com/api/shivaay/v1"
+    base_url=os.getenv("SHIVAAY_BASE_URL", "https://api.futurixai.com/api/shivaay/v1")
 )
 
+def _clean_sql_from_model(text: str) -> str:
+    # Remove markdown fences and stray backticks
+    sql = text.replace("```sql", "").replace("```", "").strip(" \n`")
+    return sql
 
 def run_discrepancy_query(request: str):
     """
-    Ask Shivaay AI to generate an SQL query to find discrepancies
-    between invoice_data and po_data tables in the local SQLite database.
+    Use Shivaay AI to generate a valid SQLite query to find mismatches
+    in invoice_data and po_data tables. Use json_extract for SQLite.
     """
 
     try:
-        # Step 1: Ask the LLM to write SQL
         prompt = f"""
-        You are a data assistant for financial record verification.
-        The database has two tables: invoice_data and po_data.
-        Each has fields: id, filename, raw_text, parsed_data (JSON).
+You are a SQLite SQL generator. The DB is SQLite and JSON fields must be accessed using json_extract(column, '$.key').
+There are two tables:
 
-        Generate a valid SQLite SQL query that answers this request:
-        "{request}"
+1) invoice_data:
+   - id
+   - filename
+   - parsed_data (JSON with keys: invoice_number, vendor, purchase_order_reference, total_amount, invoice_date)
 
-        Example requests:
-        - Find mismatched totals
-        - Show invoices where vendor differs from PO
-        - List all records with mismatched PO numbers
+2) po_data:
+   - id
+   - filename
+   - parsed_data (JSON with keys: purchase_order_id, vendor, total_value, order_date)
 
-        ONLY return valid SQL syntax, no explanations.
-        """
+Write a SINGLE valid SQLite SQL query (no explanation, no markdown fences) to satisfy this request:
+\"{request}\"
+
+Important:
+- Use json_extract(parsed_data, '$.<key>') to extract values.
+- Cast numeric fields where needed: CAST(json_extract(... ) AS REAL)
+- Join invoice_data and po_data by purchase_order_reference == purchase_order_id (where appropriate).
+Return only the SQL query text.
+"""
 
         completion = client.chat.completions.create(
-            model="shivaay",
+            model=os.getenv("SHIVAAY_MODEL", "shivaay"),
             messages=[
-                {"role": "system", "content": "You are an SQL generator."},
-                {"role": "user", "content": prompt},
+                {"role": "system", "content": "You are an expert SQLite query generator. Output only the SQL query."},
+                {"role": "user", "content": prompt}
             ],
-            temperature=0.2,
-            max_tokens=400,
+            temperature=0.0,
+            max_tokens=512
         )
 
-        sql_query = completion.choices[0].message.content.strip()
+        raw_sql = completion.choices[0].message.content
+        sql_query = _clean_sql_from_model(raw_sql)
 
-        # Step 2: Run that SQL query
+        # Safety: very small whitelist check (ensure it starts with SELECT)
+        if not sql_query.lower().strip().startswith("select"):
+            return {"error": "Model did not return a SELECT query.", "sql": sql_query}
+
         conn = sqlite3.connect("verifin.db")
         cursor = conn.cursor()
 
@@ -57,7 +75,6 @@ def run_discrepancy_query(request: str):
 
         conn.close()
 
-        # Step 3: Return result
         return {"sql": sql_query, "rows": rows}
 
     except Exception as e:
