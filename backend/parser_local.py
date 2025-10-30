@@ -1,11 +1,9 @@
-# parser_local.py
+# parser_local.py  – improved parser with hybrid OCR + strong prompt
 import os
 import json
 from dotenv import load_dotenv
 from openai import OpenAI
 from typing import Union
-
-# use your OCR helper
 from ocr import extract_text_from_pdf
 from ocr_worker import extract_text as extract_text_from_bytes
 
@@ -17,11 +15,10 @@ client = OpenAI(
 )
 
 def _safe_load_json(text: str) -> Union[dict, str]:
-    """Try to parse text as JSON, otherwise return cleaned text string."""
+    """Try to parse text as JSON, otherwise return cleaned text."""
     try:
         return json.loads(text)
     except Exception:
-        # try to be tolerant: if text contains markdown fences, strip them
         cleaned = text.strip().strip("` \n")
         try:
             return json.loads(cleaned)
@@ -30,42 +27,49 @@ def _safe_load_json(text: str) -> Union[dict, str]:
 
 def parse_with_shivaay_ai(file_path: str) -> dict:
     """
-    Accepts a file path (PDF or image).
-    - extracts text using pdfplumber/pytesseract
-    - calls Shivaay LLM asking for a structured JSON
-    - returns a dict (if JSON parseable) or a dict with 'raw_parsed' text otherwise
+    - Extracts text using pdfplumber/pytesseract (hybrid OCR)
+    - Calls Shivaay LLM for structured JSON
+    - Returns dict or {"raw_parsed": "..."} fallback
     """
-    # Extract text first
+    if not os.path.exists(file_path):
+        return {"error": f"File not found: {file_path}"}
+
     ext = file_path.lower().split(".")[-1]
     extracted_text = ""
+    prompt = ""
+
+    # ---------- OCR Extraction ----------
     try:
         if ext == "pdf":
             extracted_text = extract_text_from_pdf(file_path)
         else:
-            # open bytes and use ocr_worker for images
             with open(file_path, "rb") as f:
                 file_bytes = f.read()
             extracted_text = extract_text_from_bytes(file_bytes, os.path.basename(file_path))
     except Exception as e:
-        print("OCR error:", e)
+        print(f"[PARSER OCR ERROR] {file_path}: {e}")
         extracted_text = ""
 
-        prompt = (
+    if not extracted_text.strip():
+        return {"error": "No text extracted from document (possibly image-only or unreadable)."}
+
+    # ---------- Build Prompt ----------
+    prompt = (
         "You are a financial document parser for invoices and purchase orders. "
-        "Extract structured fields and return valid JSON only (no explanation). "
-        "If a field is missing, omit it or set it to null.\n\n"
-        "Field equivalences to understand:\n"
-        "- 'invoice_number' and 'purchase_order_id' or 'purchase_order_reference' refer to document identifiers that may cross-reference each other.\n"
-        "- Dates (invoice_date and order_date) may differ slightly; that does not imply a mismatch.\n"
-        "- Always extract vendor, totals, and identifiers clearly.\n\n"
-        "Expected keys for an invoice:\n"
-        "invoice_number, vendor, purchase_order_reference, total_amount, invoice_date\n\n"
-        "Expected keys for a purchase order:\n"
-        "purchase_order_id, vendor, total_value, order_date\n\n"
-        "Document:\n"
-        f"{extracted_text}"
+        "Always output valid JSON only — no explanation or markdown. "
+        "If a field is missing, set it to null.\n\n"
+        "Equivalent fields:\n"
+        "- invoice_number ≈ purchase_order_reference ≈ purchase_order_id\n"
+        "- total_amount ≈ total_value\n"
+        "- invoice_date ≈ order_date (minor differences are normal)\n\n"
+        "Expected keys:\n"
+        "invoice_number, vendor, purchase_order_reference, total_amount, invoice_date, "
+        "purchase_order_id, total_value, order_date\n\n"
+        "Document text:\n"
+        f"{extracted_text[:8000]}"  # limit to avoid token overflow
     )
 
+    # ---------- Call Shivaay LLM ----------
     try:
         completion = client.chat.completions.create(
             model=os.getenv("SHIVAAY_MODEL", "shivaay"),
@@ -79,27 +83,24 @@ def parse_with_shivaay_ai(file_path: str) -> dict:
 
         raw = completion.choices[0].message.content.strip()
         parsed = _safe_load_json(raw)
-        # if parsed is a string (still text), try a last resort: look for a JSON substring
+
+        # Try to recover embedded JSON if still text
         if isinstance(parsed, str):
-            # try to find first '{' and last '}' and json.loads that slice
             try:
                 s = parsed
-                start = s.find('{')
-                end = s.rfind('}')
-                if start != -1 and end != -1 and end > start:
-                    maybe = s[start:end+1]
-                    parsed2 = json.loads(maybe)
-                    parsed = parsed2
+                start, end = s.find("{"), s.rfind("}")
+                if start != -1 and end > start:
+                    parsed = json.loads(s[start:end + 1])
             except Exception:
                 pass
 
-        # Guarantee a dict return type for callers
+        # Guarantee dictionary return
         if isinstance(parsed, dict):
+            print(f"[PARSER] Parsed keys: {list(parsed.keys())}")
             return parsed
         else:
-            # fallback: wrap parsed text
             return {"raw_parsed": parsed if isinstance(parsed, str) else str(parsed)}
 
     except Exception as e:
-        print("Error calling Shivaay API:", e)
+        print(f"[PARSER LLM ERROR] {file_path}: {e}")
         return {"raw_parsed": ""}
