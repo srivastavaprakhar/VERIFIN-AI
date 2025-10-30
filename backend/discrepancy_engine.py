@@ -7,11 +7,46 @@ def detect_discrepancies(invoice_data: dict, po_data: dict) -> dict:
     mismatches = {}
 
     # Match PO references
-    if invoice_data.get("purchase_order_reference") != po_data.get("purchase_order_id"):
-        mismatches["po_number"] = {
-            "invoice": invoice_data.get("purchase_order_reference"),
-            "po": po_data.get("purchase_order_id")
+    # Match PO / Invoice reference numbers (allow invoice_number as fallback)
+    invoice_ref = (
+        invoice_data.get("purchase_order_reference")
+        or invoice_data.get("invoice_number")
+    )
+    po_ref = po_data.get("purchase_order_id")
+
+    if invoice_ref and po_ref:
+        if str(invoice_ref).strip().lower() != str(po_ref).strip().lower():
+            mismatches["reference_number"] = {
+                "invoice": invoice_ref,
+                "po": po_ref
+            }
+    else:
+        # If one is missing, note it for completeness
+        mismatches["reference_number"] = {
+            "invoice": invoice_ref or "missing",
+            "po": po_ref or "missing"
         }
+
+    # Compare dates (allow small differences)
+    from datetime import datetime
+
+    invoice_date = invoice_data.get("invoice_date")
+    po_date = po_data.get("order_date")
+
+    def parse_date_safe(d):
+        try:
+            return datetime.strptime(d, "%Y-%m-%d")
+        except Exception:
+            try:
+                return datetime.strptime(d, "%d-%m-%Y")
+            except Exception:
+                return None
+
+    d1, d2 = parse_date_safe(invoice_date), parse_date_safe(po_date)
+    if d1 and d2:
+        diff_days = abs((d1 - d2).days)
+        if diff_days > 5:  # allow 5-day difference window
+            mismatches["date"] = {"invoice": invoice_date, "po": po_date}
 
     # Match vendors
     if invoice_data.get("vendor") != po_data.get("vendor"):

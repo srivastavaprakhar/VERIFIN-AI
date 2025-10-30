@@ -50,13 +50,17 @@ def parse_with_shivaay_ai(file_path: str) -> dict:
         print("OCR error:", e)
         extracted_text = ""
 
-    prompt = (
-        "You are a financial document parser. Extract structured invoice or purchase order fields "
-        "and output valid JSON. Only return JSON (no explanation). "
+        prompt = (
+        "You are a financial document parser for invoices and purchase orders. "
+        "Extract structured fields and return valid JSON only (no explanation). "
         "If a field is missing, omit it or set it to null.\n\n"
-        "Important expected keys for an invoice (if present):\n"
+        "Field equivalences to understand:\n"
+        "- 'invoice_number' and 'purchase_order_id' or 'purchase_order_reference' refer to document identifiers that may cross-reference each other.\n"
+        "- Dates (invoice_date and order_date) may differ slightly; that does not imply a mismatch.\n"
+        "- Always extract vendor, totals, and identifiers clearly.\n\n"
+        "Expected keys for an invoice:\n"
         "invoice_number, vendor, purchase_order_reference, total_amount, invoice_date\n\n"
-        "Important expected keys for a purchase order (if present):\n"
+        "Expected keys for a purchase order:\n"
         "purchase_order_id, vendor, total_value, order_date\n\n"
         "Document:\n"
         f"{extracted_text}"
