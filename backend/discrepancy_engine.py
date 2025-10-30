@@ -1,18 +1,37 @@
-def detect_discrepancies(invoice_data: dict, po_data: dict) -> list:
-    mismatches = []
+def detect_discrepancies(invoice_data: dict, po_data: dict) -> dict:
+    mismatches = {}
 
     if invoice_data.get("po_number") != po_data.get("po_number"):
-        mismatches.append("PO number mismatch.")
+        mismatches["po_number"] = {
+            "invoice": invoice_data.get("po_number"),
+            "po": po_data.get("po_number")
+        }
 
     if invoice_data.get("vendor") != po_data.get("vendor"):
-        mismatches.append("Vendor mismatch.")
+        mismatches["vendor"] = {
+            "invoice": invoice_data.get("vendor"),
+            "po": po_data.get("vendor")
+        }
 
-    if abs(invoice_data.get("total_amount", 0) - po_data.get("total_amount", 0)) > 0.01:
-        mismatches.append(
-            f"Amount mismatch: Invoice = {invoice_data.get('total_amount')}, PO = {po_data.get('total_amount')}"
-        )
+    try:
+        inv_total = float(invoice_data.get("total_amount", 0))
+        po_total = float(po_data.get("total_amount", 0))
+    except Exception:
+        inv_total = po_total = 0
+
+    if abs(inv_total - po_total) > 0.01:
+        mismatches["total_amount"] = {
+            "invoice": inv_total,
+            "po": po_total
+        }
 
     if invoice_data.get("date") != po_data.get("date"):
-        mismatches.append("Date mismatch.")
+        mismatches["date"] = {
+            "invoice": invoice_data.get("date"),
+            "po": po_data.get("date")
+        }
 
-    return mismatches or ["✅ No discrepancies found!"]
+    if not mismatches:
+        mismatches["status"] = {"invoice": "✅ No discrepancies found!", "po": ""}
+
+    return mismatches

@@ -9,4 +9,5 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
 
 def init_db():
+    """Initialize the database and create tables if they don't exist."""
     Base.metadata.create_all(bind=engine)

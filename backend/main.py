@@ -5,7 +5,7 @@ from parser_local import parse_with_shivaay_ai
 from ocr import extract_text_from_pdf
 from db import SessionLocal, init_db
 from models import InvoiceData, POData, Discrepancy
-from discrepancy import detect_discrepancies
+from discrepancy_engine import detect_discrepancies
 import json
 
 app = FastAPI()
@@ -110,22 +110,28 @@ async def upload_po(file: UploadFile = File(...)):
     db.add(po_entry)
 
     # Save discrepancies
-    for field, values in mismatches.items():
-        discrepancy = Discrepancy(
-            field=field,
-            invoice_value=str(values["invoice"]),
-            po_value=str(values["po"])
-        )
-        db.add(discrepancy)
+    # After running detect_discrepancies(invoice_data, po_data)
+    mismatches = detect_discrepancies(invoice_data, parsed_po)
 
-    db.commit()
-    db.close()
+    # Just return the list directly
+    return {"mismatches": mismatches}
 
-    return {
-        "message": "PO uploaded, compared, and discrepancies stored successfully!",
-        "mismatches": mismatches
-    }
-
+from fastapi import Query
+from fastapi.responses import JSONResponse
+from db import init_db
+init_db()
+    
+@app.get("/detect-discrepancy")
+def detect_discrepancy(request: str = Query(...)):
+    """
+    Uses Shivaay AI to generate and run SQL discrepancy checks.
+    """
+    try:
+        from discrepancy_llm import run_discrepancy_query
+        result = run_discrepancy_query(request)
+        return JSONResponse(content={"query": request, "result": result})
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
 
 @app.get("/")
 def root():

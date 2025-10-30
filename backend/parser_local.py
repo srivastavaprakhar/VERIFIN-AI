@@ -11,9 +11,6 @@ client = OpenAI(
 )
 
 def parse_with_shivaay_ai(extracted_text: str):
-    """
-    Sends OCR-extracted invoice or PO text to Shivaay AI for parsing and structured output.
-    """
     try:
         completion = client.chat.completions.create(
             model="shivaay",
@@ -26,7 +23,12 @@ def parse_with_shivaay_ai(extracted_text: str):
         )
 
         message = completion.choices[0].message
-        return message.get("content", "{}")
+        # Return its text content safely
+        return getattr(message, "content", "{}")
+
+    except Exception as e:
+        print("Error calling Shivaay API:", e)
+        return "{}"
     
     except Exception as e:
         print("Error calling Shivaay API:", e)
