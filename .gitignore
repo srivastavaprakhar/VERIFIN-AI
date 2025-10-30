@@ -1,0 +1,28 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+env/
+venv/
+.env
+.env.*
+*.sqlite3
+*.db
+verifin_ai.db
+verifin.db
+
+# IDE
+.vscode/
+*.code-workspace
+
+# uploads and extracted data
+extracted_data/
+uploads/
+
+# pyenv
+.python-version
+
+# mac/windows
+.DS_Store
+Thumbs.db
