@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card"
 import type { DocumentPair } from "@/lib/types"
 import { uploadInvoice, uploadPO } from "@/lib/api"
 import { toExtractedData } from "@/lib/mappers"
+import { compareDocuments } from "@/lib/utils/diff-utils"
 
 interface UploadSectionProps {
   onFilesUploaded: (pairs: DocumentPair[]) => void
@@ -123,14 +124,23 @@ export function UploadSection({ onFilesUploaded }: UploadSectionProps) {
           }
         }
 
+        // Auto-compare if both invoice and PO data are available
+        let mismatches: DocumentPair["mismatches"] = []
+        let status: DocumentPair["status"] = "extracted"
+
+        if (invoiceData && poData) {
+          mismatches = compareDocuments(invoiceData, poData)
+          status = "compared"
+        }
+
         const pair: DocumentPair = {
           id: `pair-${Date.now()}-${i}`,
           invoiceFile: invoiceFile as File,
           poFile,
           invoiceData,
           poData,
-          mismatches: [],
-          status: "extracted",
+          mismatches,
+          status,
           uploadedAt: new Date(),
           lastUpdated: new Date(),
         }
@@ -289,10 +299,10 @@ export function UploadSection({ onFilesUploaded }: UploadSectionProps) {
           {isProcessing ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Parsing Documents...
+              Checking for Discrepancies...
             </>
           ) : (
-            `Parse & Extract Data (${invoiceFiles.length + poFiles.length} files)`
+            `Check for Discrepancies (${invoiceFiles.length + poFiles.length} files)`
           )}
         </Button>
       )}

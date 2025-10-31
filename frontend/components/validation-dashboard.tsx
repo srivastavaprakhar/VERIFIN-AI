@@ -98,16 +98,6 @@ export function ValidationDashboard({ documentPairs, onPairSelected, onPairVerif
                   </td>
                   <td className="py-3 px-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {pair.status === "extracted" && (
-                        <Button
-                          onClick={() => handleVerify(pair)}
-                          size="sm"
-                          variant="outline"
-                          className="text-xs text-slate-100 dark:text-slate-100"
-                        >
-                          Compare
-                        </Button>
-                      )}
                       <Button
                         onClick={() => handleViewDetails(pair)}
                         size="sm"
