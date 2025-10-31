@@ -22,7 +22,7 @@ import {
   PolarRadiusAxis,
   Radar,
 } from "recharts"
-import { AlertTriangle, CheckCircle2, Package, TrendingUp, Activity, Zap } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Package, TrendingUp, Zap } from "lucide-react"
 import type { DocumentPair } from "@/lib/types"
 
 interface AdvancedDashboardProps {
@@ -86,7 +86,6 @@ export function AdvancedDashboard({ documentPairs, analyticsView }: AdvancedDash
       mismatchTypeData,
       performanceData,
       avgProcessingTime: "2.3s",
-      systemHealth: 98,
     }
   }, [documentPairs])
 
@@ -95,8 +94,8 @@ export function AdvancedDashboard({ documentPairs, analyticsView }: AdvancedDash
 
   return (
     <div className="space-y-8">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+  {/* KPI Cards */}
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Total Documents */}
         <Card className="relative overflow-hidden p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm rounded-xl">
           <div className="relative flex items-start justify-between">
@@ -136,18 +135,7 @@ export function AdvancedDashboard({ documentPairs, analyticsView }: AdvancedDash
           </div>
         </Card>
 
-        {/* System Health */}
-        <Card className="relative overflow-hidden p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm rounded-xl">
-          <div className="relative flex items-start justify-between">
-            <div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">System Health</p>
-              <p className="text-4xl font-bold text-slate-900 dark:text-white mt-1">{analytics.systemHealth}%</p>
-            </div>
-            <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <Activity className="w-6 h-6 text-slate-600 dark:text-slate-300" />
-            </div>
-          </div>
-        </Card>
+        {/* System Health removed */}
       </div>
 
       {/* Charts Grid */}
